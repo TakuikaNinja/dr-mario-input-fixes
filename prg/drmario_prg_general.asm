@@ -300,26 +300,19 @@ render_sprites:
 ;; Strobes controllers then reads button inputs for both controllers (as well as expansion ports for Famicom)
 ;;
 get_CTRL_inputs:         
-        ldx ctrlPort             
-        inx                                  
-        stx CTRL1                
-        dex                      
-        stx CTRL1               ;1/0 write to get button states 
-        ldx #$08                ;Then eight sequential reads       
+        lda #$01
+        sta CTRL1
+        sta p1_btns_pressed,X   ; init ring counter
+        lsr a
+        sta CTRL1               ;1/0 write to get button states       
     @read_CTRL_loop:         
-        lda CTRL1                
-        lsr A                    
-        rol p1_btns_pressed     ;Data from standard controller goes here   
-        lsr A                    
-        rol CTRL_exp1           ;Data from expansion port goes here (Famicom only)   
-        lda CTRL2               ;Same principle for controller 2 and expansion 2   
-        lsr A                    
-        rol p2_btns_pressed      
-        lsr A                    
-        rol CTRL_exp2                 
-        dex                      
-        bne @read_CTRL_loop      
-        rts                      
+        lda CTRL1,X
+        and #%00000011
+        cmp #$01
+        rol p1_btns_pressed,X
+        bcc @read_CTRL_loop
+        rts
+	.dsb 11
 
 ;;
 ;; addExpansionCTRL [$B7CF]
@@ -346,36 +339,30 @@ endif
 ;;
 ;; Get inputs twice to ensure accuracy, then process which ones are held or simply pressed
 ;;
-;; Local variables:
-p1_btns_pressed_tmp     = tmp48
-p2_btns_pressed_tmp     = tmp49
-getInputs:               
-        jsr get_CTRL_inputs      
-        jsr addExpansionCTRL     
-        lda p1_btns_pressed      
-        sta p1_btns_pressed_tmp                
-        lda p2_btns_pressed      
-        sta p2_btns_pressed_tmp                
-        jsr get_CTRL_inputs     ;Redundancy to ensure the button press was not a false positive 
-        jsr addExpansionCTRL     
-        lda p1_btns_pressed      
-        and p1_btns_pressed_tmp     
-        sta p1_btns_pressed      
-        lda p2_btns_pressed      
-        and p2_btns_pressed_tmp                
-        sta p2_btns_pressed      
-    _pressedVsHeld:             
-        ldx #$01                ;Loop once each time for each controller   
-    @pressedVsHeld_loop:     
+getInputs:
+		ldx #0
+		jsr readjoyx_safe
+		inx
+
+readjoyx_safe:
+		jsr get_CTRL_inputs
+reread:
+		lda p1_btns_pressed,X
+		pha
+		jsr get_CTRL_inputs
+		pla
+		cmp p1_btns_pressed,X
+		bne reread
+         
+    _pressedVsHeld:     
         lda p1_btns_pressed,X    
         tay                      
         eor p1_btns_held,X       
         and p1_btns_pressed,X    
         sta p1_btns_pressed,X   ;If a button was held, do not count as pressed   
-        sty p1_btns_held,X      ;Keeps held, adds newly pressed, removes not held anymore (in other words, currently pressed buttons)    
-        dex                      
-        bpl @pressedVsHeld_loop  
-        rts                      
+        sty p1_btns_held,X      ;Keeps held, adds newly pressed, removes not held anymore (in other words, currently pressed buttons)
+        rts     
+	.dsb 17
 
 if !removeUnused
     getInputs_redundancy_UNUSED:

@@ -6,5 +6,5 @@ INES_SRAM   = 0 ; 0 = no SRAM
 .byte $02 ; 16k PRG chunk count
 .byte $04 ; 8k CHR chunk count
 .byte INES_MIRROR | (INES_SRAM << 1) | ((INES_MAPPER & $0F) << 4)
-.byte (INES_MAPPER & %11110000) ;mapper high nybble
-.byte $00, $00, $00, $00, $00, $00, $00, $00 ; padding
+.byte (INES_MAPPER & %11110000) | %00001000 ;mapper high nybble
+.byte $50, $00, $00, $00, ver_EU, $00, $00, $01 ; padding
